@@ -1,73 +1,61 @@
-# Gestión Agroinsumos del Huila
+# Agroinsumos del Huila S.A.S. — Sistema Integral ERP
 
-Vue 3 + Vuetify + Supabase (reemplazo de la app de Power Apps / Excel).
+Sistema integral de gestión administrativa, comercial, inventario, talento humano y control corporativo desarrollado en **Vue 3**, **Vuetify 3**, **Vite** y **Supabase**.
 
-## 1. Instalar dependencias
+---
+
+## 🚀 Módulos Implementados
+
+- **🏢 Identidad Corporativa & MVH**: Información institucional, Misión, Visión 2030, trayectoria e historia con línea de tiempo.
+- **👥 Clientes**: Directorio de clientes, estado de cartera, contactos y direcciones.
+- **🤝 Proveedores**: Directorio de aliados comerciales, contactos y gestión.
+- **📦 Productos e Inventario**: Catálogo valorizado con costos, precios de venta, stock mínimo y alertas automáticas de reabastecimiento.
+- **🔄 Kardex de Movimientos**: Registro de entradas, salidas, transferencias y control de existencias en tiempo real.
+- **🧾 Facturación de Venta (FV)**: Generación de facturas con validación de existencias y cálculo automático de subtotales.
+- **🛒 Órdenes de Compra**: Gestión de compras y pedidos a proveedores con notificación por correo.
+- **🏢 Activos Fijos**: Control de propiedad, planta y equipo con cálculo de vida útil, depreciación mensual, acumulada y valor en libros.
+- **👔 Talento Humano (Hojas de Vida)**: Directorio de colaboradores con cargos, salarios, EPS y datos contractuales.
+- **🌳 Organigrama Jerárquico**: Árbol organizacional dinámico basado en líneas de reporte reales (`jefe_id`) y niveles de jerarquía.
+- **📊 Libro Maestro en Excel**: Exportación unificada multi-hoja con portada interactiva, logo institucional, hipervínculos de navegación interna, botón de retorno y filtros nativos.
+- **🔒 Seguridad y Usuarios**: Autenticación con Supabase Auth, roles (Admin / Usuario) y auditoría.
+
+---
+
+## 🛠️ Instalación y Ejecución Local
+
+### 1. Clonar e instalar dependencias
 
 ```bash
+git clone <URL_DEL_REPOSITORIO>
+cd agroinsumos-app
 npm install
 ```
 
-## 2. Configurar las variables de entorno
+### 2. Configurar variables de entorno
+
+Copia el archivo de plantilla:
 
 ```bash
 cp .env.example .env
 ```
 
-Abre `.env` y completa con los datos de tu proyecto de Supabase:
-- Ve a tu proyecto en supabase.com -> Project Settings -> API
-- VITE_SUPABASE_URL = el "Project URL"
-- VITE_SUPABASE_ANON_KEY = la "anon public" key
+Configura en `.env`:
+- `VITE_SUPABASE_URL` = URL de tu proyecto de Supabase
+- `VITE_SUPABASE_ANON_KEY` = Clave pública anónima de Supabase
+- `VITE_USER_SERVICE_URL` = URL del microservicio de usuarios
 
-El archivo `.env` nunca se sube a Git (ya esta en .gitignore), asi que cada
-persona que clone el proyecto debe crear el suyo propio con sus propias claves.
-
-## 3. Correr en desarrollo
+### 3. Iniciar servidor de desarrollo
 
 ```bash
 npm run dev
 ```
 
-Abre la URL que te muestre en consola (normalmente http://localhost:5173).
+La aplicación se ejecutará en: `http://localhost:5173`.
 
-## 4. Subir a Git
+---
 
-Si es la primera vez:
+## ☁️ Despliegue en Producción
 
-```bash
-git init
-git add .
-git commit -m "Proyecto inicial: Productos e Inventario con Supabase"
-git branch -M main
-git remote add origin TU-URL-DE-GITHUB
-git push -u origin main
-```
-
-Si ya tienes el repo creado y clonado, simplemente:
-
-```bash
-git add .
-git commit -m "Descripcion de lo que cambiaste"
-git push
-```
-
-## Estructura del proyecto
-
-```
-src/
-  lib/supabase.js       -> conexion a Supabase
-  router/index.js       -> rutas de la app
-  views/
-    ProductosView.vue   -> CRUD de productos
-    InventarioView.vue  -> consulta de movimientos (solo lectura)
-  App.vue               -> layout (menu lateral + barra superior)
-  main.js                -> arranque de la app (Vuetify + router)
-```
-
-## Que falta por construir (proximos pasos)
-
-- [ ] Pantalla de Proveedores
-- [ ] Pantalla de Clientes
-- [ ] Pantalla de Orden de Compra (con envio de correo por proveedor)
-- [ ] Pantalla de Factura (con validacion de stock)
-- [ ] Autenticacion (login de usuarios)
+El proyecto está optimizado para desplegarse con 1 solo clic en **Vercel** o **Netlify**:
+- `vercel.json` incluido para redirección de rutas SPA y proxy de microservicios.
+- `public/_redirects` incluido para compatibilidad con Netlify y Cloudflare Pages.
