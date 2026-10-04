@@ -324,15 +324,25 @@ async function autocompletarPorCedula() {
   try {
     let data = null
 
-    // 1. Intentar consulta a la tabla clientes
-    const { data: dbData, error } = await supabase
-      .from('clientes')
-      .select('cedula, nombre, apellidos, telefono, correo, direccion')
-      .eq('cedula', cedula)
-      .maybeSingle()
+    // 1. Intentar por RPC SECURITY DEFINER (para cuando el visitante es anónimo y RLS restringe la tabla)
+    try {
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('fn_buscar_cliente_tienda', { p_cedula: cedula })
+      if (!rpcErr && rpcData) {
+        data = Array.isArray(rpcData) ? (rpcData[0] || null) : rpcData
+      }
+    } catch (_) {}
 
-    if (!error && dbData) {
-      data = dbData
+    // 2. Si no retornó por RPC, consultar directo a la tabla clientes
+    if (!data) {
+      const { data: dbData, error } = await supabase
+        .from('clientes')
+        .select('cedula, nombre, apellidos, telefono, correo, direccion')
+        .eq('cedula', cedula)
+        .maybeSingle()
+
+      if (!error && dbData) {
+        data = dbData
+      }
     }
 
     // 2. Si no se encontró por API directa, buscar si está en el caché en memoria
