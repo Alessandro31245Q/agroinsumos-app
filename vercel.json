@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/email/:path*",
+      "destination": "https://emailservice-i0wa.onrender.com/api/email/:path*"
+    },
+    {
+      "source": "/api/users/:path*",
+      "destination": "https://userservice-517a.onrender.com/api/users/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
