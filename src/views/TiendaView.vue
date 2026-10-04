@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { supabase } from '../lib/supabase'
+import { erpCache } from '../lib/erpDataCache'
 import { urlImagen } from '../utils/imagen'
 import { sendEmail } from '../lib/emailService'
 
@@ -299,6 +300,19 @@ const formCliente = ref({
   direccion: '',
 })
 
+// Debounce para autocompletar mientras el usuario escribe la cédula
+let timerBuscarCedula = null
+function onCedulaInput() {
+  clienteEncontrado.value = false
+  if (timerBuscarCedula) clearTimeout(timerBuscarCedula)
+  const val = formCliente.value.cedula?.trim()
+  if (val && val.length >= 6) {
+    timerBuscarCedula = setTimeout(() => {
+      autocompletarPorCedula()
+    }, 450)
+  }
+}
+
 // Busca si ya existe un cliente con esa cédula y rellena el formulario
 async function autocompletarPorCedula() {
   const cedula = formCliente.value.cedula?.trim()
@@ -307,23 +321,42 @@ async function autocompletarPorCedula() {
   buscandoCliente.value = true
   clienteEncontrado.value = false
 
-  const { data, error } = await supabase
-    .from('clientes')
-    .select('cedula, nombre, apellidos, telefono, correo, direccion')
-    .eq('cedula', cedula)
-    .maybeSingle()
+  try {
+    let data = null
 
-  buscandoCliente.value = false
+    // 1. Intentar consulta a la tabla clientes
+    const { data: dbData, error } = await supabase
+      .from('clientes')
+      .select('cedula, nombre, apellidos, telefono, correo, direccion')
+      .eq('cedula', cedula)
+      .maybeSingle()
 
-  if (!error && data) {
-    // Cliente existente: prellenar campos y no sobrescribir lo que el usuario ya escribió
-    formCliente.value.nombre    = data.nombre    || formCliente.value.nombre
-    formCliente.value.apellidos = data.apellidos || formCliente.value.apellidos
-    formCliente.value.telefono  = data.telefono  || formCliente.value.telefono
-    formCliente.value.correo    = data.correo    || formCliente.value.correo
-    formCliente.value.direccion = data.direccion || formCliente.value.direccion
-    clienteEncontrado.value = true
-    mostrarMensaje('Cliente encontrado, datos cargados automáticamente.', 'info')
+    if (!error && dbData) {
+      data = dbData
+    }
+
+    // 2. Si no se encontró por API directa, buscar si está en el caché en memoria
+    if (!data && erpCache?.clientes?.length) {
+      data = erpCache.clientes.find(c => String(c.cedula).trim() === cedula)
+    }
+
+    if (data) {
+      // Cliente existente: prellenar campos
+      formCliente.value.nombre    = data.nombre    || formCliente.value.nombre
+      formCliente.value.apellidos = data.apellidos || formCliente.value.apellidos
+      formCliente.value.telefono  = data.telefono  || formCliente.value.telefono
+      formCliente.value.correo    = data.correo    || formCliente.value.correo
+      formCliente.value.direccion = data.direccion || formCliente.value.direccion
+      clienteEncontrado.value = true
+      mostrarMensaje(`Cliente encontrado: ${data.nombre} ${data.apellidos || ''}`.trim(), 'info')
+    } else {
+      // No existe o es cliente nuevo
+      clienteEncontrado.value = false
+    }
+  } catch (err) {
+    console.error('Error al autocompletar cliente por cédula:', err)
+  } finally {
+    buscandoCliente.value = false
   }
 }
 
@@ -968,12 +1001,25 @@ onMounted(cargarProductos)
                     type="text"
                     class="field-input"
                     :class="{ 'field-input-found': clienteEncontrado }"
-                    placeholder="Ej. 1075234567  (tus datos se cargarán automáticamente)"
+                    placeholder="Ej. 1075234567  (escribe o presiona Buscar)"
                     required
+                    @input="onCedulaInput"
                     @blur="autocompletarPorCedula"
+                    @keydown.enter.prevent="autocompletarPorCedula"
                   />
+                  <button
+                    v-if="!buscandoCliente && !clienteEncontrado"
+                    type="button"
+                    class="field-search-btn"
+                    title="Buscar cliente por cédula"
+                    @click="autocompletarPorCedula"
+                    :disabled="!formCliente.cedula?.trim()"
+                  >
+                    <v-icon size="14">mdi-magnify</v-icon>
+                    <span>Buscar</span>
+                  </button>
                   <span v-if="buscandoCliente" class="field-spinner">
-                    <v-progress-circular indeterminate size="16" width="2" color="#C86236" />
+                    <v-progress-circular indeterminate size="16" width="2" color="#1B5E20" />
                   </span>
                   <span v-else-if="clienteEncontrado" class="field-found-badge">
                     <v-icon size="16" color="#0F6E56">mdi-check-circle</v-icon> Cliente encontrado
@@ -2212,5 +2258,28 @@ onMounted(cargarProductos)
   font-weight: 600;
   color: #0F6E56;
   white-space: nowrap;
+}
+.skyline-dialog .field-search-btn {
+  position: absolute;
+  right: 6px;
+  background: #1B5E20;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.skyline-dialog .field-search-btn:hover:not(:disabled) {
+  background: #2E7D32;
+}
+.skyline-dialog .field-search-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 </style>
