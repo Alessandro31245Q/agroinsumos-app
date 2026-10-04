@@ -1,8 +1,16 @@
 {
   "rewrites": [
     {
+      "source": "/api/email",
+      "destination": "https://emailservice-i0wa.onrender.com/api/email"
+    },
+    {
       "source": "/api/email/:path*",
       "destination": "https://emailservice-i0wa.onrender.com/api/email/:path*"
+    },
+    {
+      "source": "/api/users",
+      "destination": "https://userservice-517a.onrender.com/api/users"
     },
     {
       "source": "/api/users/:path*",

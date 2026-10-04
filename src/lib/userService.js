@@ -1,8 +1,7 @@
-// En desarrollo el proxy de Vite intercepta /api/users → Render (evita CORS)
-// En producción se usa la URL completa del UserService
-const API_BASE = import.meta.env.DEV
-  ? ''
-  : (import.meta.env.VITE_USER_SERVICE_URL || 'https://userservice-517a.onrender.com').replace(/\/+$/, '')
+// Usamos ruta relativa ('') tanto en desarrollo (proxy de Vite) como en producción (rewrites de Vercel/Netlify).
+// Esto hace que la llamada sea de mismo origen (same-origin) y el proxy reenvíe a Render,
+// eliminando por completo cualquier restricción de CORS del navegador.
+const API_BASE = ''
 
 /**
  * Procesa errores de respuesta de la API del UserService

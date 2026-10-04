@@ -1,3 +1,6 @@
-/api/email/*  https://emailservice-i0wa.onrender.com/api/email/:splat  200
-/api/users/*  https://userservice-517a.onrender.com/api/users/:splat  200
-/*            /index.html                                            200
+/api/email       https://emailservice-i0wa.onrender.com/api/email        200
+/api/email/*     https://emailservice-i0wa.onrender.com/api/email/:splat  200
+/api/users       https://userservice-517a.onrender.com/api/users        200
+/api/users/*     https://userservice-517a.onrender.com/api/users/:splat  200
+/*               /index.html                                             200
+
