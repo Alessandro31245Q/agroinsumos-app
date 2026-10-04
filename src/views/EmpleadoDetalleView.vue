@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '../lib/supabase'
 import { esAdmin } from '../lib/auth'
 import Avatar from '../components/Avatar.vue'
+import EmpleadoFotoUploader from '../components/EmpleadoFotoUploader.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -17,6 +18,21 @@ const snackbar = ref({ show: false, text: '', color: 'success' })
 
 function mostrarMensaje(text, color = 'success') {
   snackbar.value = { show: true, text, color }
+}
+
+async function actualizarFotoEmpleado(nuevaFoto) {
+  if (!empleado.value?.id) return
+  let res = await supabase.from('empleados').update({ foto_url: nuevaFoto || null }).eq('id', empleado.value.id)
+  if (res.error && res.error.message?.includes('column')) {
+    res = await supabase.from('empleados').update({ imagen_url: nuevaFoto || null }).eq('id', empleado.value.id)
+  }
+  if (!res.error) {
+    empleado.value.foto_url = nuevaFoto
+    empleado.value.imagen_url = nuevaFoto
+    mostrarMensaje('Fotografía de perfil actualizada con éxito')
+  } else {
+    mostrarMensaje('Error al actualizar foto: ' + res.error.message, 'error')
+  }
 }
 
 const nombreCompleto = computed(() => {
@@ -183,21 +199,39 @@ onMounted(cargarDetalle)
         <v-col cols="12" md="8">
           <!-- Encabezado Titular tipo CV -->
           <v-card elevation="2" class="rounded-lg pa-6 mb-6">
-            <div class="d-flex align-center flex-wrap gap-4">
-              <Avatar :nombre="nombreCompleto" :size="76" font-size="28px" class="mr-4" />
-              <div>
-                <h1 class="text-h4 font-weight-bold text-slate-800 mb-1">
-                  {{ nombreCompleto }}
-                </h1>
-                <div class="text-h6 text-primary font-weight-medium mb-1">
-                  {{ empleado.cargo }}
-                </div>
-                <div v-if="empleado.area" class="text-subtitle-2 text-medium-emphasis">
-                  <v-icon size="16" class="mr-1">mdi-domain</v-icon>
-                  Área: {{ empleado.area }}
+            <div class="d-flex align-center justify-space-between flex-wrap gap-4 mb-4">
+              <div class="d-flex align-center flex-wrap gap-4">
+                <Avatar
+                  :nombre="nombreCompleto"
+                  :foto="empleado.foto || empleado.foto_url || empleado.avatar_url || ''"
+                  :size="80"
+                  font-size="30px"
+                  class="mr-4 elevation-2"
+                />
+                <div>
+                  <h1 class="text-h4 font-weight-bold text-slate-800 mb-1">
+                    {{ nombreCompleto }}
+                  </h1>
+                  <div class="text-h6 text-primary font-weight-medium mb-1">
+                    {{ empleado.cargo }}
+                  </div>
+                  <div v-if="empleado.area" class="text-subtitle-2 text-medium-emphasis">
+                    <v-icon size="16" class="mr-1">mdi-domain</v-icon>
+                    Área: {{ empleado.area }}
+                  </div>
                 </div>
               </div>
             </div>
+
+            <!-- Widget Uploadcare para actualizar fotografía de perfil -->
+            <v-divider class="my-3" />
+            <EmpleadoFotoUploader
+              :model-value="empleado.foto || empleado.foto_url || empleado.imagen_url || empleado.avatar_url || ''"
+              :nombre="nombreCompleto"
+              :empleado-id="empleado.id"
+              @guardado="(url) => { if (empleado) { empleado.foto_url = url; empleado.imagen_url = url; empleado.foto = url; } }"
+              @update:model-value="actualizarFotoEmpleado"
+            />
           </v-card>
 
           <!-- Sección: Datos de Contacto -->

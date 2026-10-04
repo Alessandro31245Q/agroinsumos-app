@@ -1,8 +1,16 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 const props = defineProps({
   nombre: {
+    type: String,
+    default: '',
+  },
+  foto: {
+    type: String,
+    default: '',
+  },
+  src: {
     type: String,
     default: '',
   },
@@ -14,7 +22,20 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  useDefaultAvatar: {
+    type: Boolean,
+    default: true,
+  },
 })
+
+const imageError = ref(false)
+
+watch(
+  () => props.foto || props.src,
+  () => {
+    imageError.value = false
+  }
+)
 
 // Paleta fija de 8 colores armónicos y determinísticos
 const PALETTE = [
@@ -48,16 +69,60 @@ const colorFondo = computed(() => {
   const index = Math.abs(hash) % PALETTE.length
   return PALETTE[index]
 })
+
+const imageUrl = computed(() => {
+  if (imageError.value) return null
+  const customFoto = props.foto || props.src
+  if (customFoto && customFoto.trim()) {
+    const val = customFoto.trim()
+    if (val.startsWith('http://') || val.startsWith('https://') || val.startsWith('data:')) {
+      return val
+    }
+    // Si es un UUID de Uploadcare
+    return `https://30mojuouxo.ucarecd.net/${val}/`
+  }
+
+  // Si tiene nombre, generamos un avatar estilizado y nítido
+  if (props.useDefaultAvatar && props.nombre) {
+    const seed = encodeURIComponent(props.nombre.trim())
+    return `https://api.dicebear.com/7.x/personas/svg?seed=${seed}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`
+  }
+  return null
+})
 </script>
 
 <template>
   <v-avatar
     :size="size"
     :style="{ backgroundColor: colorFondo, color: '#ffffff', fontWeight: 'bold' }"
-    class="elevation-1"
+    class="elevation-1 avatar-organigrama overflow-hidden"
   >
-    <span :style="{ fontSize: fontSize || `${Math.max(12, Math.round(Number(size) * 0.4))}px` }">
+    <v-img
+      v-if="imageUrl"
+      :src="imageUrl"
+      :alt="nombre"
+      cover
+      @error="imageError = true"
+    >
+      <template #placeholder>
+        <div class="d-flex align-center justify-center fill-height" :style="{ backgroundColor: colorFondo }">
+          <span :style="{ fontSize: fontSize || `${Math.max(12, Math.round(Number(size) * 0.38))}px` }">
+            {{ iniciales }}
+          </span>
+        </div>
+      </template>
+    </v-img>
+    <span v-else :style="{ fontSize: fontSize || `${Math.max(12, Math.round(Number(size) * 0.38))}px` }">
       {{ iniciales }}
     </span>
   </v-avatar>
 </template>
+
+<style scoped>
+.avatar-organigrama {
+  transition: transform 0.2s ease;
+}
+.avatar-organigrama:hover {
+  transform: scale(1.05);
+}
+</style>

@@ -168,7 +168,7 @@ async function cargarMasLideresRaiz(reiniciar = false) {
   try {
     let q = supabase
       .from('empleados')
-      .select('id, nombres, apellidos, cedula, cargo, area, estado, correo, telefono, jefe_id, orden', { count: 'exact' })
+      .select('*', { count: 'exact' })
       .is('jefe_id', null)
       .order('orden', { ascending: true })
       .order('nombres', { ascending: true })
@@ -219,7 +219,7 @@ async function cargarSubordinadosNodo(node) {
   try {
     let q = supabase
       .from('empleados')
-      .select('id, nombres, apellidos, cedula, cargo, area, estado, correo, telefono, jefe_id, orden', { count: 'exact' })
+      .select('*', { count: 'exact' })
       .eq('jefe_id', node.id)
       .order('orden', { ascending: true })
       .order('nombres', { ascending: true })
@@ -569,7 +569,12 @@ onMounted(() => {
           </div>
 
           <div class="d-flex align-center pa-3 mb-4 rounded-lg bg-grey-lighten-4 border">
-            <Avatar :nombre="`${empleadoAMover.nombres} ${empleadoAMover.apellidos}`" :size="40" class="mr-3" />
+            <Avatar
+              :nombre="`${empleadoAMover.nombres} ${empleadoAMover.apellidos}`"
+              :foto="empleadoAMover.foto || empleadoAMover.foto_url || empleadoAMover.avatar_url || ''"
+              :size="40"
+              class="mr-3"
+            />
             <div>
               <div class="font-weight-bold">{{ empleadoAMover.nombres }} {{ empleadoAMover.apellidos }}</div>
               <div class="text-caption text-primary">{{ empleadoAMover.cargo }}</div>
@@ -658,7 +663,8 @@ onMounted(() => {
           <div class="d-flex align-center mb-4">
             <Avatar
               :nombre="`${empleadoSeleccionado.nombres} ${empleadoSeleccionado.apellidos}`"
-              :size="54"
+              :foto="empleadoSeleccionado.foto || empleadoSeleccionado.foto_url || empleadoSeleccionado.avatar_url || ''"
+              :size="56"
               class="mr-4"
             />
             <div>

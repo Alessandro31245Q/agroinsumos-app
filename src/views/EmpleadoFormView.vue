@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '../lib/supabase'
 import { esAdmin } from '../lib/auth'
+import EmpleadoFotoUploader from '../components/EmpleadoFotoUploader.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -24,6 +25,7 @@ const form = ref({
   cedula: '',
   nombres: '',
   apellidos: '',
+  foto_url: '',
   fecha_nacimiento: null,
   telefono: '',
   correo: '',
@@ -95,6 +97,7 @@ async function cargarDatosParaEditar() {
       cedula: data.cedula || '',
       nombres: data.nombres || '',
       apellidos: data.apellidos || '',
+      foto_url: data.foto_url || data.imagen_url || data.foto || data.avatar_url || '',
       fecha_nacimiento: data.fecha_nacimiento || null,
       telefono: data.telefono || '',
       correo: data.correo || '',
@@ -138,16 +141,38 @@ async function guardar() {
     fecha_retiro: form.value.fecha_retiro || null,
     tipo_contrato: form.value.tipo_contrato || null,
     estado: form.value.estado || 'Activo',
+    foto_url: form.value.foto_url || null,
   }
 
   let errorEmpleado = null
 
-  // 1. Guardar datos principales del empleado (transacción lógica)
+  // 1. Guardar datos principales del empleado
   if (editando.value) {
-    const res = await supabase.from('empleados').update(payloadEmpleado).eq('id', empleadoId)
+    let res = await supabase.from('empleados').update(payloadEmpleado).eq('id', empleadoId)
+    // Si la columna foto_url no existe, intentar con imagen_url o sin foto
+    if (res.error && res.error.message?.includes('column')) {
+      const payloadAlt = { ...payloadEmpleado }
+      delete payloadAlt.foto_url
+      let res2 = await supabase.from('empleados').update({ ...payloadAlt, imagen_url: form.value.foto_url || null }).eq('id', empleadoId)
+      if (res2.error && res2.error.message?.includes('column')) {
+        res = await supabase.from('empleados').update(payloadAlt).eq('id', empleadoId)
+      } else {
+        res = res2
+      }
+    }
     errorEmpleado = res.error
   } else {
-    const res = await supabase.from('empleados').insert(payloadEmpleado).select('id').single()
+    let res = await supabase.from('empleados').insert(payloadEmpleado).select('id').single()
+    if (res.error && res.error.message?.includes('column')) {
+      const payloadAlt = { ...payloadEmpleado }
+      delete payloadAlt.foto_url
+      let res2 = await supabase.from('empleados').insert({ ...payloadAlt, imagen_url: form.value.foto_url || null }).select('id').single()
+      if (res2.error && res2.error.message?.includes('column')) {
+        res = await supabase.from('empleados').insert(payloadAlt).select('id').single()
+      } else {
+        res = res2
+      }
+    }
     errorEmpleado = res.error
     if (!errorEmpleado && res.data) {
       empleadoId = res.data.id
@@ -266,9 +291,17 @@ onMounted(() => {
           <v-avatar color="primary" size="32" class="mr-3 text-white font-weight-bold">1</v-avatar>
           <div>
             <h2 class="text-h6 font-weight-bold">Datos Personales</h2>
-            <div class="text-caption text-medium-emphasis">Información básica y de contacto del colaborador</div>
+            <div class="text-caption text-medium-emphasis">Información básica, fotografía de perfil y contacto del colaborador</div>
           </div>
         </div>
+
+        <!-- Uploader de Fotografía con Uploadcare -->
+        <EmpleadoFotoUploader
+          v-model="form.foto_url"
+          :nombre="`${form.nombres} ${form.apellidos}`.trim() || 'Colaborador'"
+          :empleado-id="id || ''"
+          class="mb-6"
+        />
 
         <v-row dense>
           <v-col cols="12" sm="6">

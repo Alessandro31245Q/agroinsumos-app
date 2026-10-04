@@ -564,9 +564,83 @@ onMounted(cargarProductos)
           </v-row>
         </v-container>
       </section>
+
+      <!-- SECCIÓN PROMOCIONAL DE LA EMPRESA CON VIDEO -->
+      <section class="video-promo-section mt-12 mb-12">
+        <v-container>
+          <div class="video-promo-card">
+            <div class="promo-bg-glow"></div>
+            <v-row align="center" class="position-relative z-1">
+              <!-- INFORMACIÓN PROMOCIONAL -->
+              <v-col cols="12" lg="5" class="promo-text-col pa-6 pa-md-10">
+                <div class="d-flex align-center gap-2 mb-3">
+                  <span class="promo-badge">
+                    <v-icon icon="mdi-play-circle" size="16" class="mr-1"></v-icon>
+                    NUESTRA PASIÓN EN ACCIÓN
+                  </span>
+                </div>
+                <h3 class="promo-title">Comprometidos con el Campo Huilense</h3>
+                <p class="promo-lead">
+                  Conoce de cerca cómo impulsamos la productividad de nuestros agricultores con soluciones agropecuarias de vanguardia, tecnología de punta y respaldo permanente.
+                </p>
+                <div class="promo-features mt-6">
+                  <div class="promo-feature-item">
+                    <div class="feature-icon-wrapper">
+                      <v-icon icon="mdi-sprout" color="#1B5E20" size="20"></v-icon>
+                    </div>
+                    <div>
+                      <strong class="feature-title">Calidad Garantizada</strong>
+                      <p class="feature-desc">Insumos certificados de las mejores marcas nacionales e internacionales.</p>
+                    </div>
+                  </div>
+                  <div class="promo-feature-item mt-4">
+                    <div class="feature-icon-wrapper">
+                      <v-icon icon="mdi-handshake" color="#1B5E20" size="20"></v-icon>
+                    </div>
+                    <div>
+                      <strong class="feature-title">Acompañamiento Técnico</strong>
+                      <p class="feature-desc">Asesoría agronómica experta y personalizada para optimizar el rendimiento de sus cultivos.</p>
+                    </div>
+                  </div>
+                </div>
+                <div class="mt-8 d-flex align-center gap-3 flex-wrap">
+                  <button class="skyline-btn-primary" @click="vistaActual = 'CATALOGO'">
+                    Explorar Catálogo <v-icon icon="mdi-arrow-right" size="small" class="ml-1"></v-icon>
+                  </button>
+                  <a href="#empresa-info" class="skyline-btn-outline text-decoration-none">
+                    Conocer Más
+                  </a>
+                </div>
+              </v-col>
+
+              <!-- VIDEO INSTITUCIONAL -->
+              <v-col cols="12" lg="7" class="promo-video-col pa-6 pa-md-8">
+                <div class="video-player-wrapper">
+                  <video 
+                    class="promo-video-player"
+                    controls
+                    playsinline
+                    preload="metadata"
+                    src="https://30mojuouxo.ucarecd.net/6a571485-8d86-4376-86bc-7098359c25c6/fcf43a30a470494db5eca416107af499.mp4"
+                  >
+                    Tu navegador no soporta la reproducción de video.
+                  </video>
+                  <div class="video-caption-bar">
+                    <div class="d-flex align-center">
+                      <v-icon icon="mdi-movie-open" size="18" class="mr-2 text-primary"></v-icon>
+                      <span class="video-caption-text">AgroInsumos del Huila S.A.S. · Video Institucional</span>
+                    </div>
+                    <span class="video-hd-pill">HD 1080p</span>
+                  </div>
+                </div>
+              </v-col>
+            </v-row>
+          </div>
+        </v-container>
+      </section>
       
       <!-- SECCIÓN CORPORATIVA & UBICACIÓN -->
-      <section class="empresa-section mt-12 mb-12">
+      <section id="empresa-info" class="empresa-section mt-12 mb-12">
         <v-container>
           <div class="empresa-card">
             <div class="empresa-watermark">HUILA</div>
@@ -2291,5 +2365,150 @@ onMounted(cargarProductos)
 .skyline-dialog .field-search-btn:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* ==========================================================================
+   SECCIÓN PROMOCIONAL VIDEO INSTITUCIONAL
+   ========================================================================== */
+.video-promo-section {
+  position: relative;
+}
+
+.video-promo-card {
+  position: relative;
+  background: linear-gradient(135deg, #FAF7F2 0%, #F4ECE1 100%);
+  border-radius: 20px;
+  border: 1px solid rgba(200, 98, 54, 0.15);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.promo-bg-glow {
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 500px;
+  height: 500px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(27, 94, 32, 0.08) 0%, rgba(200, 98, 54, 0.04) 50%, transparent 70%);
+  pointer-events: none;
+}
+
+.promo-badge {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(200, 98, 54, 0.12);
+  color: #C86236;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(200, 98, 54, 0.25);
+  text-transform: uppercase;
+}
+
+.promo-title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 2.1rem;
+  font-weight: 700;
+  color: #1A1A1A;
+  line-height: 1.25;
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.promo-lead {
+  font-size: 0.98rem;
+  line-height: 1.65;
+  color: #555555;
+}
+
+.promo-feature-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.feature-icon-wrapper {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(27, 94, 32, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.feature-title {
+  font-size: 0.95rem;
+  color: #1A1A1A;
+  display: block;
+}
+
+.feature-desc {
+  font-size: 0.84rem;
+  color: #666666;
+  margin: 2px 0 0 0;
+  line-height: 1.4;
+}
+
+.video-player-wrapper {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #000000;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.video-player-wrapper:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 42px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(200, 98, 54, 0.3);
+}
+
+.promo-video-player {
+  width: 100%;
+  max-height: 420px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+  background: #0a0a0a;
+}
+
+.video-caption-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: #181818;
+  color: #E0E0E0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.video-caption-text {
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+
+.video-hd-pill {
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: #C86236;
+  color: #FFFFFF;
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+@media (max-width: 960px) {
+  .promo-title {
+    font-size: 1.65rem;
+  }
+  .promo-video-player {
+    max-height: 280px;
+  }
 }
 </style>

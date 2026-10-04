@@ -70,10 +70,9 @@ async function cargarEmpleados() {
   const from = (pagina.value - 1) * tamanoPagina.value
   const to = from + tamanoPagina.value - 1
 
-  // Select explícito: SOLO columnas necesarias, NUNCA select('*')
   let query = supabase
     .from('empleados')
-    .select('id, nombres, apellidos, cedula, cargo, area, estado', { count: 'exact' })
+    .select('*', { count: 'exact' })
     .order('nombres', { ascending: true })
 
   const termino = busqueda.value.trim()
@@ -252,7 +251,11 @@ onMounted(async () => {
               @click="irAlDetalle(item.id)"
             >
               <td style="width: 60px;">
-                <Avatar :nombre="`${item.nombres} ${item.apellidos}`" :size="36" />
+                <Avatar
+                  :nombre="`${item.nombres} ${item.apellidos}`"
+                  :foto="item.foto || item.foto_url || item.avatar_url || ''"
+                  :size="36"
+                />
               </td>
               <td class="font-weight-medium">
                 {{ item.cedula }}

@@ -119,7 +119,8 @@ function onDrop(event) {
         <div class="d-flex align-center">
           <Avatar
             :nombre="`${node.nombres} ${node.apellidos}`"
-            :size="42"
+            :foto="node.foto || node.foto_url || node.avatar_url || ''"
+            :size="46"
             class="mr-3 flex-shrink-0"
           />
           <div class="text-truncate w-100">

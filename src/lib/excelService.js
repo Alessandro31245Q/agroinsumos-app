@@ -23,6 +23,91 @@ function getColumnLetter(colIndex) {
   return letter
 }
 
+/**
+ * Genera un avatar PNG en Base64 para incrustar directamente en las tarjetas del organigrama de Excel.
+ * Si el empleado tiene foto en Uploadcare u otra URL, la descarga y dibuja recortada en círculo;
+ * si no, dibuja el avatar corporativo con las iniciales y color jerárquico.
+ */
+async function generarAvatarPngBase64(nombre, colorHex = '#1b5e20', fotoUrl = '') {
+  try {
+    if (typeof document === 'undefined') return null
+    const canvas = document.createElement('canvas')
+    canvas.width = 120
+    canvas.height = 120
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+
+    // 1. Si tiene foto en Uploadcare o URL
+    if (fotoUrl && String(fotoUrl).trim()) {
+      let finalUrl = String(fotoUrl).trim()
+      if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+        finalUrl = `https://30mojuouxo.ucarecd.net/${finalUrl}/`
+      }
+      try {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        await new Promise((resolve, reject) => {
+          img.onload = resolve
+          img.onerror = reject
+          img.src = finalUrl
+          setTimeout(reject, 2000)
+        })
+
+        // Dibujar imagen recortada circularmente
+        ctx.save()
+        ctx.beginPath()
+        ctx.arc(60, 60, 56, 0, Math.PI * 2)
+        ctx.clip()
+        ctx.drawImage(img, 0, 0, 120, 120)
+        ctx.restore()
+
+        // Borde circular
+        ctx.beginPath()
+        ctx.arc(60, 60, 56, 0, Math.PI * 2)
+        ctx.lineWidth = 4
+        ctx.strokeStyle = colorHex
+        ctx.stroke()
+
+        return canvas.toDataURL('image/png')
+      } catch (e) {
+        // Fallback a iniciales si falla la red
+      }
+    }
+
+    // 2. Fondo circular con color jerárquico
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.15)'
+    ctx.shadowBlur = 6
+    ctx.shadowOffsetY = 2
+
+    ctx.beginPath()
+    ctx.arc(60, 60, 52, 0, Math.PI * 2)
+    ctx.fillStyle = colorHex
+    ctx.fill()
+
+    // Borde blanco nítido
+    ctx.shadowColor = 'transparent'
+    ctx.lineWidth = 4
+    ctx.strokeStyle = '#ffffff'
+    ctx.stroke()
+
+    // Iniciales en el centro
+    const partes = (nombre || '?').trim().split(/\s+/).filter(Boolean)
+    const iniciales = partes.length >= 2
+      ? (partes[0][0] + partes[1][0]).toUpperCase()
+      : (partes[0] ? partes[0].slice(0, 2).toUpperCase() : '?')
+
+    ctx.fillStyle = '#ffffff'
+    ctx.font = 'bold 44px "Segoe UI", Arial, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(iniciales, 60, 63)
+
+    return canvas.toDataURL('image/png')
+  } catch (e) {
+    return null
+  }
+}
+
 // ─── Estilos corporativos de alta calidad ──────────────────────────────────
 const FONT_TITULO = { name: 'Segoe UI', size: 15, bold: true, color: { argb: 'FFFFFFFF' } }
 const FONT_SUB = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FFFFFFFF' } }
@@ -860,43 +945,11 @@ export async function exportarLibroMaestroCompletoERP() {
   })
 
   // ──────────────────────────────────────────────────────────────────────
-  // PESTAÑA 4: 🌳 ORGANIGRAMA EMPRESARIAL (ÁRBOL JERÁRQUICO REAL Y DINÁMICO)
+  // PESTAÑA 4: 🌳 ORGANIGRAMA EMPRESARIAL (ÁRBOL GRÁFICO 2D CON FOTOS)
   // ──────────────────────────────────────────────────────────────────────
   const wsOrg = wb.addWorksheet(H_ORG, { views: [{ showGridLines: true }] })
-  wsOrg.columns = [
-    { width: 3 },  // A
-    { width: 14 }, // B: Nivel
-    { width: 36 }, // C: Árbol Jerárquico Visual
-    { width: 26 }, // D: Colaborador
-    { width: 15 }, // E: Cédula
-    { width: 25 }, // F: Cargo
-    { width: 20 }, // G: Área
-    { width: 26 }, // H: Jefe Inmediato
-    { width: 16 }, // I: Subordinados
-    { width: 14 }, // J: Estado
-    { width: 16 }, // K: Teléfono
-    { width: 26 }, // L: Correo
-    { width: 3 },  // M
-  ]
 
-  // Fila 1: Banner + Volver
-  wsOrg.getRow(1).height = 32
-  safeMerge(wsOrg, 1, 2, 1, 10)
-  wsOrg.getCell(1, 2).value = 'AGROINSUMOS DEL HUILA S.A.S. — ESTRUCTURA ORGANIZACIONAL'
-  wsOrg.getCell(1, 2).font = { name: 'Segoe UI', size: 12, bold: true, color: { argb: 'FFFFFFFF' } }
-  wsOrg.getCell(1, 2).fill = FILL_PRIMARY
-  wsOrg.getCell(1, 2).alignment = { horizontal: 'center', vertical: 'middle' }
-  addBackButton(wsOrg, 1, 11, 12)
-
-  // Fila 2: Subtítulo
-  safeMerge(wsOrg, 2, 2, 2, 12)
-  wsOrg.getCell(2, 2).value = 'ORGANIGRAMA JERÁRQUICO OFICIAL (DATOS REALES DEL SISTEMA)'
-  wsOrg.getCell(2, 2).font = FONT_SUB
-  wsOrg.getCell(2, 2).fill = FILL_SECONDARY
-  wsOrg.getCell(2, 2).alignment = { horizontal: 'center', vertical: 'middle' }
-  wsOrg.getRow(2).height = 24
-
-  // 1. CONSTRUCCIÓN DEL ÁRBOL REAL DESDE LOS DATOS DE EMPLEADOS
+  // 1. CONSTRUCCIÓN DEL ÁRBOL JERÁRQUICO
   const mapaEmpleados = new Map()
   empleados.forEach((emp) => {
     mapaEmpleados.set(emp.id, {
@@ -914,180 +967,317 @@ export async function exportarLibroMaestroCompletoERP() {
       emp.jefeNombre = jefe.nombreCompleto
       emp.jefeCargo = jefe.cargo || 'Líder de Área'
     } else {
-      emp.jefeNombre = '— (Máxima Autoridad / Cúspide)'
+      emp.jefeNombre = '— (Alta Dirección)'
       emp.jefeCargo = 'Alta Dirección'
       raicesReales.push(emp)
     }
   })
 
-  // Aplanar el árbol en recorrido jerárquico (DFS)
-  const arbolAplanado = []
-  const visitados = new Set()
-
-  function recorrerNodo(nodo, nivel, prefijo, esUltimo) {
-    if (visitados.has(nodo.id)) return
-    visitados.add(nodo.id)
-
-    const conector = nivel === 1 ? '🏢 ' : (esUltimo ? '└── 👔 ' : '├── 👔 ')
-    arbolAplanado.push({
-      ...nodo,
-      nivel,
-      totalSubordinados: nodo.subordinados ? nodo.subordinados.length : 0,
-      visualArbol: prefijo + conector + nodo.nombreCompleto,
+  // 2. CÁLCULO DE RANURAS (SLOTS) Y POSICIONES 2D DEL ÁRBOL
+  function calcularSlots(nodo) {
+    if (!nodo.subordinados || nodo.subordinados.length === 0) {
+      nodo.slots = 1
+      return 1
+    }
+    let total = 0
+    nodo.subordinados.forEach((hijo) => {
+      total += calcularSlots(hijo)
     })
-
-    const nuevoPrefijo = prefijo + (nivel === 1 ? '    ' : (esUltimo ? '     ' : '│    '))
-    const subs = nodo.subordinados || []
-    subs.forEach((hijo, idx) => {
-      recorrerNodo(hijo, nivel + 1, nuevoPrefijo, idx === subs.length - 1)
-    })
+    nodo.slots = Math.max(total, 1)
+    return nodo.slots
   }
 
-  raicesReales.forEach((raiz, i) => {
-    recorrerNodo(raiz, 1, '', i === raicesReales.length - 1)
-  })
+  raicesReales.forEach((raiz) => calcularSlots(raiz))
 
-  // 2. NODO RAÍZ EMPRESARIAL (CÚSPIDE DEL ORGANIGRAMA)
-  wsOrg.getRow(4).height = 26
-  safeMerge(wsOrg, 4, 3, 4, 11)
-  const cEmp = wsOrg.getCell(4, 3)
-  cEmp.value = '🏛️ AGROINSUMOS DEL HUILA S.A.S.'
-  cEmp.font = { name: 'Segoe UI', size: 12, bold: true, color: { argb: 'FFFFFFFF' } }
-  cEmp.fill = FILL_PRIMARY
-  cEmp.alignment = { horizontal: 'center', vertical: 'middle' }
+  // Calcular columnas y anchos dinámicos (Cada tarjeta ocupa 3 columnas + 1 separador)
+  let totalSlotsRaiz = 0
+  raicesReales.forEach((r) => { totalSlotsRaiz += r.slots })
+  const totalColumnasArbol = Math.max(totalSlotsRaiz * 4 + 4, 20)
 
-  wsOrg.getRow(5).height = 22
-  safeMerge(wsOrg, 5, 3, 5, 11)
-  const cEmpSub = wsOrg.getCell(5, 3)
-  cEmpSub.value = `Estructura Oficial • ${raicesReales.length} Líderes Principales • ${empleados.length} Total de Colaboradores`
-  cEmpSub.font = { name: 'Segoe UI', size: 9.5, italic: true, color: { argb: 'FF1B5E20' } }
-  cEmpSub.fill = FILL_LIGHT
-  cEmpSub.alignment = { horizontal: 'center', vertical: 'middle' }
-
-  for (let c = 3; c <= 11; c++) {
-    wsOrg.getCell(4, c).border = { top: { style: 'medium', color: { argb: 'FF1B5E20' } }, left: { style: 'medium', color: { argb: 'FF1B5E20' } }, right: { style: 'medium', color: { argb: 'FF1B5E20' } } }
-    wsOrg.getCell(5, c).border = { bottom: { style: 'medium', color: { argb: 'FF1B5E20' } }, left: { style: 'medium', color: { argb: 'FF1B5E20' } }, right: { style: 'medium', color: { argb: 'FF1B5E20' } } }
+  // Configurar anchos de columna para todo el lienzo del árbol
+  const colConfigs = [{ width: 4 }] // Col 1: margen A
+  for (let s = 0; s < Math.max(totalSlotsRaiz + 2, 8); s++) {
+    colConfigs.push({ width: 8 })  // Foto
+    colConfigs.push({ width: 17 }) // Nombre / Cargo
+    colConfigs.push({ width: 13 }) // Detalle / CC
+    colConfigs.push({ width: 4 })  // Separador entre tarjetas
   }
+  wsOrg.columns = colConfigs
 
-  // 3. TABLA MATRIZ JERÁRQUICA CON SANGRÍA Y ESTRUCTURA EN ÁRBOL
-  let rTabla = 7
-  safeMerge(wsOrg, rTabla, 2, rTabla, 12)
-  wsOrg.getCell(rTabla, 2).value = 'ESTRUCTURA JERÁRQUICA DEL PERSONAL (ÁRBOL ORGANIZACIONAL REAL)'
-  wsOrg.getCell(rTabla, 2).font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF1B5E20' } }
-  wsOrg.getRow(rTabla).height = 24
+  // Fila 1: Banner Principal
+  wsOrg.getRow(1).height = 32
+  safeMerge(wsOrg, 1, 2, 1, Math.min(totalColumnasArbol - 2, 16))
+  const bTitle = wsOrg.getCell(1, 2)
+  bTitle.value = 'AGROINSUMOS DEL HUILA S.A.S. — ORGANIGRAMA GENERAL DE TALENTO HUMANO'
+  bTitle.font = { name: 'Segoe UI', size: 12, bold: true, color: { argb: 'FFFFFFFF' } }
+  bTitle.fill = FILL_PRIMARY
+  bTitle.alignment = { horizontal: 'center', vertical: 'middle' }
+  addBackButton(wsOrg, 1, Math.min(totalColumnasArbol - 1, 17), Math.min(totalColumnasArbol, 18))
 
-  rTabla++
-  const headersTree = [
-    'Nivel',
-    'Jerarquía en Árbol',
-    'Colaborador',
-    'Cédula',
-    'Cargo',
-    'Área',
-    'Jefe Inmediato',
-    'Subordinados',
-    'Estado',
-    'Teléfono',
-    'Correo Electrónico',
-  ]
+  // Fila 2: Subtítulo
+  wsOrg.getRow(2).height = 22
+  safeMerge(wsOrg, 2, 2, 2, Math.min(totalColumnasArbol, 18))
+  const bSub = wsOrg.getCell(2, 2)
+  bSub.value = '🌳 ÁRBOL JERÁRQUICO 2D (ESTRUCTURA DE TARJETAS, CONECTORES VISUALES Y FOTOS DE PERFIL)'
+  bSub.font = FONT_SUB
+  bSub.fill = FILL_SECONDARY
+  bSub.alignment = { horizontal: 'center', vertical: 'middle' }
 
-  wsOrg.getRow(rTabla).height = 26
-  headersTree.forEach((h, idx) => {
-    const colNumber = idx + 2 // Inicia en columna B (2)
-    const cell = wsOrg.getCell(rTabla, colNumber)
-    cell.value = h
-    cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FFFFFFFF' } }
-    cell.fill = FILL_PRIMARY
-    cell.alignment = {
-      horizontal: idx === 0 || idx === 3 || idx === 7 || idx === 8 || idx === 9 ? 'center' : 'left',
-      vertical: 'middle',
-    }
-    cell.border = {
-      top: { style: 'medium', color: { argb: 'FF0D330E' } },
-      bottom: { style: 'medium', color: { argb: 'FF0D330E' } },
-      left: { style: 'thin', color: { argb: 'FF2E7D32' } },
-      right: { style: 'thin', color: { argb: 'FF2E7D32' } },
-    }
-  })
+  // Fila 3: Metadatos
+  wsOrg.getRow(3).height = 18
+  safeMerge(wsOrg, 3, 2, 3, Math.min(totalColumnasArbol, 18))
+  const bMeta = wsOrg.getCell(3, 2)
+  bMeta.value = `Total Colaboradores: ${empleados.length} • Estructura en ${raicesReales.length} Ramas Directivas • Diagrama 100% Gráfico`
+  bMeta.font = { name: 'Segoe UI', size: 9, italic: true, color: { argb: 'FF1B5E20' } }
+  bMeta.fill = FILL_LIGHT
+  bMeta.alignment = { horizontal: 'center', vertical: 'middle' }
 
-  // Filas de colaboradores ordenados jerárquicamente
-  if (arbolAplanado.length === 0) {
-    rTabla++
-    safeMerge(wsOrg, rTabla, 2, rTabla, 12)
-    const emptyCell = wsOrg.getCell(rTabla, 2)
-    emptyCell.value = 'No se encontraron colaboradores registrados en el sistema.'
-    emptyCell.font = { name: 'Segoe UI', size: 10, italic: true, color: { argb: 'FF777777' } }
-    emptyCell.alignment = { horizontal: 'center', vertical: 'middle' }
-    wsOrg.getRow(rTabla).height = 30
-  } else {
-    arbolAplanado.forEach((emp, idx) => {
-      rTabla++
-      const row = wsOrg.getRow(rTabla)
-      row.height = 24
+  // 3. ASIGNAR COORDENADAS HORIZONTALES (colStart, colEnd, centerCol)
+  function asignarCoordenadas(nodo, globalStartCol) {
+    nodo.colStart = globalStartCol
+    nodo.colEnd = globalStartCol + nodo.slots * 4 - 2 // ancho total de slots
+    nodo.centerCol = Math.floor((nodo.colStart + nodo.colEnd) / 2)
 
-      // Outline level para expandir / contraer en Excel según el nivel jerárquico
-      if (emp.nivel > 1) {
-        row.outlineLevel = Math.min(emp.nivel - 1, 7)
-      }
+    // La tarjeta de 3 columnas se centra en centerCol
+    nodo.cardCol1 = nodo.centerCol - 1
+    nodo.cardCol2 = nodo.centerCol
+    nodo.cardCol3 = nodo.centerCol + 1
 
-      // Estilos según el nivel jerárquico real
-      let nivelTexto = `Nivel ${emp.nivel}`
-      let bgNivel = 'FFFFFFFF'
-      let fontColor = 'FF000000'
-      let esBold = false
-
-      if (emp.nivel === 1) {
-        nivelTexto = 'Nivel 1 (Líder)'
-        bgNivel = 'FFE8F5E9'
-        fontColor = 'FF1B5E20'
-        esBold = true
-      } else if (emp.nivel === 2) {
-        nivelTexto = 'Nivel 2 (Jefatura)'
-        bgNivel = 'FFF6FAF4'
-        esBold = true
-      } else {
-        nivelTexto = `Nivel ${emp.nivel} (Operativo)`
-        bgNivel = idx % 2 === 0 ? 'FFFFFFFF' : 'FFF9FCF8'
-      }
-
-      const valoresFila = [
-        nivelTexto,
-        emp.visualArbol,
-        emp.nombreCompleto,
-        emp.cedula || '—',
-        emp.cargo || '—',
-        emp.area || 'General',
-        emp.jefeNombre || '—',
-        emp.totalSubordinados,
-        emp.estado || 'Activo',
-        emp.telefono || '—',
-        emp.correo || '—',
-      ]
-
-      valoresFila.forEach((val, cIdx) => {
-        const cell = row.getCell(cIdx + 2)
-        cell.value = val
-        cell.font = {
-          name: 'Segoe UI',
-          size: emp.nivel === 1 ? 10 : 9.5,
-          bold: cIdx === 1 ? esBold : (cIdx === 0 && emp.nivel === 1),
-          color: { argb: cIdx === 0 && emp.nivel === 1 ? fontColor : 'FF333333' },
-        }
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgNivel } }
-        cell.alignment = {
-          horizontal: cIdx === 0 || cIdx === 3 || cIdx === 7 || cIdx === 8 || cIdx === 9 ? 'center' : 'left',
-          vertical: 'middle',
-        }
-        cell.border = BORDER_SOFT
+    let currentChildCol = globalStartCol
+    if (nodo.subordinados && nodo.subordinados.length > 0) {
+      nodo.subordinados.forEach((hijo) => {
+        asignarCoordenadas(hijo, currentChildCol)
+        currentChildCol += hijo.slots * 4
       })
-    })
-
-    // Filtros automáticos en la tabla del organigrama
-    wsOrg.autoFilter = {
-      from: { row: 8, column: 2 },
-      to: { row: rTabla, column: 12 },
     }
   }
+
+  let currentColAcc = 2 // Inicia en columna B (2)
+  raicesReales.forEach((raiz) => {
+    asignarCoordenadas(raiz, currentColAcc)
+    currentColAcc += raiz.slots * 4
+  })
+
+  // 4. DIBUJAR NODO RAÍZ EMPRESARIAL (CÚSPIDE DEL ORGANIGRAMA)
+  const rootCenterCol = Math.floor((2 + currentColAcc - 2) / 2)
+  const rootCol1 = Math.max(rootCenterCol - 2, 2)
+  const rootCol2 = rootCol1 + 4
+
+  wsOrg.getRow(5).height = 26
+  safeMerge(wsOrg, 5, rootCol1, 5, rootCol2)
+  const cRoot = wsOrg.getCell(5, rootCol1)
+  cRoot.value = '🏛️ AGROINSUMOS DEL HUILA S.A.S.'
+  cRoot.font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FFFFFFFF' } }
+  cRoot.fill = FILL_PRIMARY
+  cRoot.alignment = { horizontal: 'center', vertical: 'middle' }
+
+  wsOrg.getRow(6).height = 18
+  safeMerge(wsOrg, 6, rootCol1, 6, rootCol2)
+  const cRootSub = wsOrg.getCell(6, rootCol1)
+  cRootSub.value = 'DIRECCIÓN GENERAL Y ASAMBLEA'
+  cRootSub.font = { name: 'Segoe UI', size: 8.5, bold: true, color: { argb: 'FF1B5E20' } }
+  cRootSub.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5E9' } }
+  cRootSub.alignment = { horizontal: 'center', vertical: 'middle' }
+
+  for (let c = rootCol1; c <= rootCol2; c++) {
+    wsOrg.getCell(5, c).border = { top: { style: 'medium', color: { argb: 'FF1B5E20' } }, left: c === rootCol1 ? { style: 'medium', color: { argb: 'FF1B5E20' } } : undefined, right: c === rootCol2 ? { style: 'medium', color: { argb: 'FF1B5E20' } } : undefined }
+    wsOrg.getCell(6, c).border = { bottom: { style: 'medium', color: { argb: 'FF1B5E20' } }, left: c === rootCol1 ? { style: 'medium', color: { argb: 'FF1B5E20' } } : undefined, right: c === rootCol2 ? { style: 'medium', color: { argb: 'FF1B5E20' } } : undefined }
+  }
+
+  // 5. FUNCIÓN RENDERIZADORA DE TARJETAS Y CONECTORES
+  async function renderizarTarjeta(nodo, rStart, nivel) {
+    const c1 = nodo.cardCol1
+    const c2 = nodo.cardCol2
+    const c3 = nodo.cardCol3
+
+    // Colores por jerarquía
+    let colorHeader = 'FF1B5E20'
+    let colorBody = 'FFF4F9F2'
+    let hexAvatar = '#1b5e20'
+    let nivelTag = 'DIRECTOR'
+
+    if (nivel === 1) {
+      colorHeader = 'FF1B5E20' // Verde oscuro
+      colorBody = 'FFF4F9F2'
+      hexAvatar = '#1b5e20'
+      nivelTag = 'GERENCIA'
+    } else if (nivel === 2) {
+      colorHeader = 'FF0F766E' // Teal
+      colorBody = 'FFF0FDF4'
+      hexAvatar = '#0f766e'
+      nivelTag = 'LÍDER DE ÁREA'
+    } else if (nivel === 3) {
+      colorHeader = 'FF1E40AF' // Azul
+      colorBody = 'FFF8FAFC'
+      hexAvatar = '#2563eb'
+      nivelTag = 'COORDINACIÓN'
+    } else {
+      colorHeader = 'FF475569' // Slate
+      colorBody = 'FFFFFFFF'
+      hexAvatar = '#059669'
+      nivelTag = 'OPERATIVO'
+    }
+
+    // Fila 1 de Tarjeta: Encabezado (Área + Nivel)
+    const r1 = rStart
+    wsOrg.getRow(r1).height = 18
+    safeMerge(wsOrg, r1, c1, r1, c3)
+    const cardHead = wsOrg.getCell(r1, c1)
+    cardHead.value = `${nivelTag} • ${nodo.area || 'General'}`.toUpperCase()
+    cardHead.font = { name: 'Segoe UI', size: 8, bold: true, color: { argb: 'FFFFFFFF' } }
+    cardHead.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colorHeader } }
+    cardHead.alignment = { horizontal: 'center', vertical: 'middle' }
+
+    // Fila 2 de Tarjeta: Foto (c1) + Nombre (c2-c3)
+    const r2 = rStart + 1
+    wsOrg.getRow(r2).height = 22
+    const cellFoto = wsOrg.getCell(r2, c1)
+    cellFoto.value = ''
+    cellFoto.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colorBody } }
+    cellFoto.alignment = { horizontal: 'center', vertical: 'middle' }
+
+    // Incrustar imagen del avatar PNG circular (desde Uploadcare si existe o iniciales)
+    try {
+      const fotoUrl = nodo.foto || nodo.foto_url || nodo.imagen_url || nodo.avatar_url || ''
+      const pngBase64 = await generarAvatarPngBase64(nodo.nombreCompleto, hexAvatar, fotoUrl)
+      if (pngBase64) {
+        const imageId = wb.addImage({
+          base64: pngBase64,
+          extension: 'png',
+        })
+        wsOrg.addImage(imageId, {
+          tl: { col: c1 - 1 + 0.1, row: r2 - 1 + 0.1 },
+          ext: { width: 42, height: 42 },
+        })
+      }
+    } catch (e) {
+      cellFoto.value = nodo.nombreCompleto.slice(0, 2).toUpperCase()
+      cellFoto.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF1B5E20' } }
+    }
+
+    safeMerge(wsOrg, r2, c2, r2, c3)
+    const cellNom = wsOrg.getCell(r2, c2)
+    cellNom.value = nodo.nombreCompleto
+    cellNom.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF1B5E20' } }
+    cellNom.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colorBody } }
+    cellNom.alignment = { vertical: 'middle' }
+
+    // Fila 3 de Tarjeta: Cargo
+    const r3 = rStart + 2
+    wsOrg.getRow(r3).height = 18
+    const cellFotoBottom = wsOrg.getCell(r3, c1)
+    cellFotoBottom.value = ''
+    cellFotoBottom.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colorBody } }
+
+    safeMerge(wsOrg, r3, c2, r3, c3)
+    const cellCargo = wsOrg.getCell(r3, c2)
+    cellCargo.value = nodo.cargo || 'Colaborador'
+    cellCargo.font = { name: 'Segoe UI', size: 8.5, bold: true, color: { argb: 'FF0F766E' } }
+    cellCargo.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colorBody } }
+    cellCargo.alignment = { vertical: 'middle' }
+
+    // Fila 4 de Tarjeta: Footer (CC + Subordinados + Estado)
+    const r4 = rStart + 3
+    wsOrg.getRow(r4).height = 16
+    safeMerge(wsOrg, r4, c1, r4, c3)
+    const cellFoot = wsOrg.getCell(r4, c1)
+    const subsText = nodo.subordinados && nodo.subordinados.length > 0 ? ` • 👥 ${nodo.subordinados.length} a cargo` : ''
+    cellFoot.value = `CC ${nodo.cedula || '—'} • ${nodo.estado || 'Activo'}${subsText}`
+    cellFoot.font = { name: 'Segoe UI', size: 7.5, color: { argb: 'FF555555' } }
+    cellFoot.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F4F0' } }
+    cellFoot.alignment = { horizontal: 'center', vertical: 'middle' }
+
+    // Bordes exteriores de la tarjeta
+    for (let r = r1; r <= r4; r++) {
+      for (let c = c1; c <= c3; c++) {
+        wsOrg.getCell(r, c).border = {
+          top: r === r1 ? { style: 'medium', color: { argb: colorHeader } } : undefined,
+          bottom: r === r4 ? { style: 'medium', color: { argb: colorHeader } } : undefined,
+          left: c === c1 ? { style: 'medium', color: { argb: colorHeader } } : undefined,
+          right: c === c3 ? { style: 'medium', color: { argb: colorHeader } } : undefined,
+        }
+      }
+    }
+  }
+
+  // 6. DIBUJAR NIVELES RECURSIVOS CON LÍNEAS DE CONEXIÓN DE ÁRBOL
+  // Conector desde la Empresa (fila 7..9)
+  wsOrg.getRow(7).height = 12
+  const cStem0 = wsOrg.getCell(7, rootCenterCol)
+  cStem0.value = '│'
+  cStem0.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF1B5E20' } }
+  cStem0.alignment = { horizontal: 'center', vertical: 'middle' }
+
+  // Barra horizontal entre líderes de Nivel 1 (Fila 8)
+  wsOrg.getRow(8).height = 10
+  if (raicesReales.length > 0) {
+    const minL1Col = raicesReales[0].centerCol
+    const maxL1Col = raicesReales[raicesReales.length - 1].centerCol
+    for (let c = minL1Col; c <= maxL1Col; c++) {
+      wsOrg.getCell(8, c).border = { top: { style: 'medium', color: { argb: 'FF1B5E20' } } }
+    }
+  }
+
+  // Gotas hacia cada líder de Nivel 1 (Fila 9)
+  wsOrg.getRow(9).height = 14
+  raicesReales.forEach((raiz) => {
+    const cDrop = wsOrg.getCell(9, raiz.centerCol)
+    cDrop.value = '▼'
+    cDrop.font = { name: 'Segoe UI', size: 8, bold: true, color: { argb: 'FF1B5E20' } }
+    cDrop.alignment = { horizontal: 'center', vertical: 'middle' }
+  })
+
+  // Renderizado recursivo de ramas del árbol
+  async function dibujarSubarbol(nodos, rStart, nivel) {
+    if (!nodos || nodos.length === 0) return
+
+    // 1. Renderizar todas las tarjetas de este nivel
+    for (const nodo of nodos) {
+      await renderizarTarjeta(nodo, rStart, nivel)
+    }
+
+    const rCardBottom = rStart + 3
+
+    // 2. Para cada nodo que tenga hijos, dibujar sus conectores y llamar recursivamente
+    for (const nodo of nodos) {
+      if (nodo.subordinados && nodo.subordinados.length > 0) {
+        const rStem = rCardBottom + 1
+        const rBar = rCardBottom + 2
+        const rDrop = rCardBottom + 3
+        const rNextCards = rCardBottom + 4
+
+        // Fila Stem (baja del padre)
+        wsOrg.getRow(rStem).height = 12
+        const cStem = wsOrg.getCell(rStem, nodo.centerCol)
+        cStem.value = '│'
+        cStem.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF1B5E20' } }
+        cStem.alignment = { horizontal: 'center', vertical: 'middle' }
+
+        // Fila Bar (barra horizontal conectora)
+        wsOrg.getRow(rBar).height = 10
+        const minChildCol = nodo.subordinados[0].centerCol
+        const maxChildCol = nodo.subordinados[nodo.subordinados.length - 1].centerCol
+        for (let c = minChildCol; c <= maxChildCol; c++) {
+          wsOrg.getCell(rBar, c).border = { top: { style: 'medium', color: { argb: 'FF1B5E20' } } }
+        }
+
+        // Fila Drop (gotas hacia cada hijo)
+        wsOrg.getRow(rDrop).height = 14
+        nodo.subordinados.forEach((hijo) => {
+          const cDrop = wsOrg.getCell(rDrop, hijo.centerCol)
+          cDrop.value = '▼'
+          cDrop.font = { name: 'Segoe UI', size: 8, bold: true, color: { argb: 'FF1B5E20' } }
+          cDrop.alignment = { horizontal: 'center', vertical: 'middle' }
+        })
+
+        // Dibujar hijos recursivamente en la fila siguiente
+        await dibujarSubarbol(nodo.subordinados, rNextCards, nivel + 1)
+      }
+    }
+  }
+
+  // Iniciar renderizado desde Nivel 1 en Fila 10
+  await dibujarSubarbol(raicesReales, 10, 1)
 
   // ──────────────────────────────────────────────────────────────────────
   // PESTAÑA 5: 👔 TALENTO HUMANO (HOJAS DE VIDA)
