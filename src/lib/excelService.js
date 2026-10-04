@@ -402,6 +402,7 @@ export async function exportarLibroMaestroCompletoERP() {
   const H_FACT = '🧾 Facturación'
   const H_INV = '🔄 Kardex Inventario'
   const H_ACT = '🏢 Activos Fijos'
+  const H_CONSULTAS = '🔍 Panel de Consultas'
 
   // ──────────────────────────────────────────────────────────────────────
   // PESTAÑA 1: 🏠 MENÚ PRINCIPAL INTERACTIVO (PORTADA EJECUTIVA ELEGANTE)
@@ -670,10 +671,20 @@ export async function exportarLibroMaestroCompletoERP() {
   // Fila 39: Separador
   wsMenu.getRow(39).height = 8
 
-  // Fila 40: Pie de Portada
-  wsMenu.getRow(40).height = 20
-  safeMerge(wsMenu, 40, 2, 40, 9)
-  const footerCover = wsMenu.getCell(40, 2)
+  // Filas 40-41: Tarjeta Panel de Consultas BUSCARV/BUSCARH (destacada)
+  wsMenu.getRow(40).height = 22
+  wsMenu.getRow(41).height = 18
+  addNavCard(wsMenu, 40, 2, 41, 9, '🔍 Panel de Consultas BUSCARV / BUSCARH ➔',
+    'Búsqueda interactiva: Productos, Clientes y Empleados con fórmulas Excel nativas',
+    H_CONSULTAS, true)
+
+  // Fila 42: Separador
+  wsMenu.getRow(42).height = 8
+
+  // Fila 43: Pie de Portada
+  wsMenu.getRow(43).height = 20
+  safeMerge(wsMenu, 43, 2, 43, 9)
+  const footerCover = wsMenu.getCell(43, 2)
   footerCover.value = 'Agroinsumos del Huila S.A.S. • Sistema de Información ERP • Reporte Oficial Confidencial'
   footerCover.font = { name: 'Segoe UI', size: 8.5, color: { argb: 'FF777777' } }
   footerCover.alignment = { horizontal: 'center', vertical: 'middle' }
@@ -1240,6 +1251,571 @@ export async function exportarLibroMaestroCompletoERP() {
     fechaStr,
     horaStr,
   })
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PESTAÑA 12: 🔍 PANEL DE CONSULTAS — BUSCARV Y BUSCARH
+  // ══════════════════════════════════════════════════════════════════════════
+  const wsQ = wb.addWorksheet(H_CONSULTAS, { views: [{ showGridLines: true, state: 'frozen', ySplit: 4 }] })
+
+  // Anchos de columnas
+  wsQ.columns = [
+    { width: 3 },   // A: margen
+    { width: 22 },  // B: etiqueta / cabecera tabla
+    { width: 28 },  // C: valor de entrada / columna 1 tabla
+    { width: 26 },  // D: resultado / columna 2 tabla
+    { width: 26 },  // E: resultado / columna 3 tabla
+    { width: 26 },  // F: resultado / columna 4 tabla
+    { width: 26 },  // G: resultado / columna 5 tabla
+    { width: 3 },   // H: margen
+  ]
+
+  // ── Fila 1: Banner principal ─────────────────────────────────────────────
+  wsQ.getRow(1).height = 32
+  safeMerge(wsQ, 1, 2, 1, 6)
+  const qBanner = wsQ.getCell(1, 2)
+  qBanner.value = 'AGROINSUMOS DEL HUILA S.A.S. — PANEL DE CONSULTAS ERP'
+  qBanner.font = { name: 'Segoe UI', size: 12, bold: true, color: { argb: 'FFFFFFFF' } }
+  qBanner.fill = FILL_PRIMARY
+  qBanner.alignment = { horizontal: 'center', vertical: 'middle' }
+  addBackButton(wsQ, 1, 7, 7)
+
+  // ── Fila 2: Subtítulo ────────────────────────────────────────────────────
+  wsQ.getRow(2).height = 24
+  safeMerge(wsQ, 2, 2, 2, 7)
+  const qSub = wsQ.getCell(2, 2)
+  qSub.value = '🔍 CONSULTAS CON BUSCARV Y BUSCARH — INGRESE EL CÓDIGO EN LA CELDA AMARILLA Y EXCEL DEVUELVE LOS DATOS AUTOMÁTICAMENTE'
+  qSub.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FFFFFFFF' } }
+  qSub.fill = FILL_SECONDARY
+  qSub.alignment = { horizontal: 'center', vertical: 'middle' }
+
+  // ── Fila 3: Metadatos ────────────────────────────────────────────────────
+  wsQ.getRow(3).height = 20
+  safeMerge(wsQ, 3, 2, 3, 7)
+  const qMeta = wsQ.getCell(3, 2)
+  qMeta.value = `Generado: ${fechaStr} ${horaStr}   •   Las fórmulas BUSCARV/BUSCARH referencian las pestañas de datos dinámicamente`
+  qMeta.font = { name: 'Segoe UI', size: 9, italic: true, color: { argb: 'FF555555' } }
+  qMeta.fill = FILL_LIGHT
+  qMeta.alignment = { horizontal: 'center', vertical: 'middle' }
+
+  // ── Fila 4: Separador ────────────────────────────────────────────────────
+  wsQ.getRow(4).height = 10
+
+  // ════════════════════════════════════════════════════════════════════════
+  // SECCIÓN 1: BUSCARV — Consulta de PRODUCTOS por Código
+  // Las columnas de la hoja Productos son (desde fila 6 de datos):
+  //   Col A=Código, B=Producto, C=Categoría, D=Unidad, E=Stock Actual,
+  //   F=Stock Mínimo, G=Costo Unitario, H=Precio Venta, I=Valor Inventario, J=Alerta
+  // ════════════════════════════════════════════════════════════════════════
+
+  // En agregarHojaDatos: HR=5 (headers), datos en HR+1..HR+n => fila 6..5+n
+  // La última fila real de datos es 5 + datos.length
+  const prodLastRow = Math.max(5 + productos.length, 7)
+  const cliLastRow  = Math.max(5 + clientes.length,  7)
+  const thLastRow   = Math.max(5 + empleados.length,  7)
+
+  // ── Fila 5: Título Sección BUSCARV Productos ─────────────────────────────
+  wsQ.getRow(5).height = 26
+  safeMerge(wsQ, 5, 2, 5, 7)
+  const qT1 = wsQ.getCell(5, 2)
+  qT1.value = '📦 SECCIÓN 1 — BUSCARV: Consultar Producto por Código'
+  qT1.font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FFFFFFFF' } }
+  qT1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E7D32' } }
+  qT1.alignment = { horizontal: 'left', vertical: 'middle' }
+
+  // ── Fila 6: Instrucción y celda de búsqueda ──────────────────────────────
+  wsQ.getRow(6).height = 28
+  wsQ.getCell(6, 2).value = '🔎 Ingrese el Código del Producto:'
+  wsQ.getCell(6, 2).font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF1B5E20' } }
+  wsQ.getCell(6, 2).alignment = { vertical: 'middle' }
+  wsQ.getCell(6, 2).fill = FILL_LIGHT
+  wsQ.getCell(6, 2).border = BORDER_SOFT
+
+  // Celda de entrada amarilla — el usuario escribe aquí el código
+  const PROD_INPUT = 'C6'
+  wsQ.getCell(6, 3).value = productos.length > 0 ? String(productos[0].codigo || '') : ''
+  wsQ.getCell(6, 3).font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF1B5E20' } }
+  wsQ.getCell(6, 3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } }  // Amarillo vivo
+  wsQ.getCell(6, 3).border = {
+    top: { style: 'medium', color: { argb: 'FFFF6F00' } },
+    bottom: { style: 'medium', color: { argb: 'FFFF6F00' } },
+    left: { style: 'medium', color: { argb: 'FFFF6F00' } },
+    right: { style: 'medium', color: { argb: 'FFFF6F00' } },
+  }
+  wsQ.getCell(6, 3).alignment = { horizontal: 'center', vertical: 'middle' }
+
+  // Nota explicativa
+  safeMerge(wsQ, 6, 4, 6, 7)
+  wsQ.getCell(6, 4).value = '← Escribe aquí el código. Las celdas de abajo se actualizan automáticamente con BUSCARV'
+  wsQ.getCell(6, 4).font = { name: 'Segoe UI', size: 9, italic: true, color: { argb: 'FF777777' } }
+  wsQ.getCell(6, 4).alignment = { vertical: 'middle' }
+
+  // ── Fila 7: Headers de resultados Productos ──────────────────────────────
+  wsQ.getRow(7).height = 24
+  const headsProd = ['Campo', 'Valor BUSCARV', 'Fórmula utilizada']
+  ;[2, 3, 4].forEach((col, i) => {
+    const c = wsQ.getCell(7, col)
+    c.value = headsProd[i]
+    c.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FFFFFFFF' } }
+    c.fill = FILL_PRIMARY
+    c.alignment = { horizontal: 'center', vertical: 'middle' }
+    c.border = BORDER_SOFT
+  })
+  // Merge columns 3-4 for value cell header, then formula column
+  safeMerge(wsQ, 7, 3, 7, 4)
+  safeMerge(wsQ, 7, 5, 7, 7)
+  const cFormulaHead = wsQ.getCell(7, 5)
+  cFormulaHead.value = 'Descripción de la fórmula'
+  cFormulaHead.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FFFFFFFF' } }
+  cFormulaHead.fill = FILL_PRIMARY
+  cFormulaHead.alignment = { horizontal: 'center', vertical: 'middle' }
+  cFormulaHead.border = BORDER_SOFT
+
+  // ── Filas 8–17: Resultados BUSCARV para cada campo de Producto ───────────
+  const camposProd = [
+    { label: 'Nombre del Producto', colNum: 2, colLetter: 'B', numFmt: null },
+    { label: 'Categoría',           colNum: 3, colLetter: 'C', numFmt: null },
+    { label: 'Unidad de Medida',    colNum: 4, colLetter: 'D', numFmt: null },
+    { label: 'Stock Actual (uds)',  colNum: 5, colLetter: 'E', numFmt: '#,##0' },
+    { label: 'Stock Mínimo (uds)',  colNum: 6, colLetter: 'F', numFmt: '#,##0' },
+    { label: 'Costo Unitario',      colNum: 7, colLetter: 'G', numFmt: '"$"#,##0' },
+    { label: 'Precio de Venta',     colNum: 8, colLetter: 'H', numFmt: '"$"#,##0' },
+    { label: 'Valor Inventario',    colNum: 9, colLetter: 'I', numFmt: '"$"#,##0' },
+    { label: 'Alerta Reposición',   colNum: 10, colLetter: 'J', numFmt: null },
+  ]
+
+  const prodRangeName = `'${H_PROD}'!A6:J${prodLastRow}`
+
+  camposProd.forEach(({ label, colNum, numFmt }, idx) => {
+    const r = 8 + idx
+    wsQ.getRow(r).height = 22
+    const even = idx % 2 === 1
+    const bgArgb = even ? 'FFF6FAF4' : 'FFFFFFFF'
+
+    // Columna B: nombre del campo
+    wsQ.getCell(r, 2).value = label
+    wsQ.getCell(r, 2).font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF1B5E20' } }
+    wsQ.getCell(r, 2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgArgb } }
+    wsQ.getCell(r, 2).border = BORDER_SOFT
+    wsQ.getCell(r, 2).alignment = { vertical: 'middle' }
+
+    // Columnas C-D: resultado con fórmula BUSCARV
+    safeMerge(wsQ, r, 3, r, 4)
+    const cellVal = wsQ.getCell(r, 3)
+    const formula = `VLOOKUP(${PROD_INPUT},${prodRangeName},${colNum},0)`
+    cellVal.value = { formula }
+    cellVal.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF1B5E20' } }
+    cellVal.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: even ? 'FFE8F5E9' : 'FFF4F9F2' } }
+    cellVal.border = {
+      top: { style: 'thin', color: { argb: 'FF2E7D32' } },
+      bottom: { style: 'thin', color: { argb: 'FF2E7D32' } },
+      left: { style: 'medium', color: { argb: 'FF2E7D32' } },
+      right: { style: 'medium', color: { argb: 'FF2E7D32' } },
+    }
+    cellVal.alignment = { horizontal: 'center', vertical: 'middle' }
+    if (numFmt) cellVal.numFmt = numFmt
+
+    // Columnas E-G: descripción de la fórmula en texto
+    safeMerge(wsQ, r, 5, r, 7)
+    const cellDesc = wsQ.getCell(r, 5)
+    cellDesc.value = `=BUSCARV(C6,'${H_PROD}'!A6:J${prodLastRow},${colNum},0)`
+    cellDesc.font = { name: 'Courier New', size: 8.5, color: { argb: 'FF1565C0' } }
+    cellDesc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F8FF' } }
+    cellDesc.border = BORDER_SOFT
+    cellDesc.alignment = { vertical: 'middle' }
+  })
+
+  // Fila 18: separador
+  wsQ.getRow(18).height = 14
+
+  // ════════════════════════════════════════════════════════════════════════
+  // SECCIÓN 2: BUSCARV — Consulta de CLIENTE por Cédula / NIT
+  // Columnas hoja Clientes: A=Cédula/NIT, B=Nombre, C=Apellidos, D=Teléfono,
+  //   E=Correo, F=Dirección, G=Estado, H=Fecha Registro
+  // ════════════════════════════════════════════════════════════════════════
+
+  wsQ.getRow(19).height = 26
+  safeMerge(wsQ, 19, 2, 19, 7)
+  const qT2 = wsQ.getCell(19, 2)
+  qT2.value = '👥 SECCIÓN 2 — BUSCARV: Consultar Cliente por Cédula / NIT'
+  qT2.font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FFFFFFFF' } }
+  qT2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1565C0' } }
+  qT2.alignment = { horizontal: 'left', vertical: 'middle' }
+
+  // Celda de entrada clientes
+  wsQ.getRow(20).height = 28
+  wsQ.getCell(20, 2).value = '🔎 Ingrese Cédula / NIT del Cliente:'
+  wsQ.getCell(20, 2).font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF1565C0' } }
+  wsQ.getCell(20, 2).alignment = { vertical: 'middle' }
+  wsQ.getCell(20, 2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE3F2FD' } }
+  wsQ.getCell(20, 2).border = BORDER_SOFT
+
+  const CLI_INPUT = 'C20'
+  wsQ.getCell(20, 3).value = clientes.length > 0 ? String(clientes[0].cedula || '') : ''
+  wsQ.getCell(20, 3).font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF1565C0' } }
+  wsQ.getCell(20, 3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } }
+  wsQ.getCell(20, 3).border = {
+    top: { style: 'medium', color: { argb: 'FFFF6F00' } },
+    bottom: { style: 'medium', color: { argb: 'FFFF6F00' } },
+    left: { style: 'medium', color: { argb: 'FFFF6F00' } },
+    right: { style: 'medium', color: { argb: 'FFFF6F00' } },
+  }
+  wsQ.getCell(20, 3).alignment = { horizontal: 'center', vertical: 'middle' }
+
+  safeMerge(wsQ, 20, 4, 20, 7)
+  wsQ.getCell(20, 4).value = '← Escribe aquí la cédula o NIT. BUSCARV localiza al cliente en la hoja de Clientes'
+  wsQ.getCell(20, 4).font = { name: 'Segoe UI', size: 9, italic: true, color: { argb: 'FF777777' } }
+  wsQ.getCell(20, 4).alignment = { vertical: 'middle' }
+
+  // Headers resultados clientes
+  wsQ.getRow(21).height = 24
+  ;[2, 3, 5].forEach((col) => {
+    const c = wsQ.getCell(21, col)
+    c.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FFFFFFFF' } }
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1565C0' } }
+    c.alignment = { horizontal: 'center', vertical: 'middle' }
+    c.border = BORDER_SOFT
+  })
+  wsQ.getCell(21, 2).value = 'Campo'
+  safeMerge(wsQ, 21, 3, 21, 4)
+  wsQ.getCell(21, 3).value = 'Valor BUSCARV'
+  wsQ.getCell(21, 3).font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FFFFFFFF' } }
+  wsQ.getCell(21, 3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1565C0' } }
+  wsQ.getCell(21, 3).alignment = { horizontal: 'center', vertical: 'middle' }
+  wsQ.getCell(21, 3).border = BORDER_SOFT
+  safeMerge(wsQ, 21, 5, 21, 7)
+  wsQ.getCell(21, 5).value = 'Descripción de la fórmula'
+  wsQ.getCell(21, 5).font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FFFFFFFF' } }
+  wsQ.getCell(21, 5).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1565C0' } }
+  wsQ.getCell(21, 5).alignment = { horizontal: 'center', vertical: 'middle' }
+  wsQ.getCell(21, 5).border = BORDER_SOFT
+
+  // Filas resultados clientes
+  const camposCli = [
+    { label: 'Nombre',          colNum: 2, colLetter: 'B' },
+    { label: 'Apellidos',       colNum: 3, colLetter: 'C' },
+    { label: 'Teléfono',        colNum: 4, colLetter: 'D' },
+    { label: 'Correo',          colNum: 5, colLetter: 'E' },
+    { label: 'Dirección',       colNum: 6, colLetter: 'F' },
+    { label: 'Estado',          colNum: 7, colLetter: 'G' },
+    { label: 'Fecha Registro',  colNum: 8, colLetter: 'H' },
+  ]
+  const cliRangeName = `'${H_CLI}'!A6:H${cliLastRow}`
+
+  camposCli.forEach(({ label, colNum }, idx) => {
+    const r = 22 + idx
+    wsQ.getRow(r).height = 22
+    const even = idx % 2 === 1
+    const bgArgb = even ? 'FFF6FAF4' : 'FFFFFFFF'
+
+    wsQ.getCell(r, 2).value = label
+    wsQ.getCell(r, 2).font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF1565C0' } }
+    wsQ.getCell(r, 2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgArgb } }
+    wsQ.getCell(r, 2).border = BORDER_SOFT
+    wsQ.getCell(r, 2).alignment = { vertical: 'middle' }
+
+    safeMerge(wsQ, r, 3, r, 4)
+    const cellVal = wsQ.getCell(r, 3)
+    const formula = `VLOOKUP(${CLI_INPUT},${cliRangeName},${colNum},0)`
+    cellVal.value = { formula }
+    cellVal.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF1565C0' } }
+    cellVal.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: even ? 'FFE3F2FD' : 'FFBBDEFB' } }
+    cellVal.border = {
+      top: { style: 'thin', color: { argb: 'FF1565C0' } },
+      bottom: { style: 'thin', color: { argb: 'FF1565C0' } },
+      left: { style: 'medium', color: { argb: 'FF1565C0' } },
+      right: { style: 'medium', color: { argb: 'FF1565C0' } },
+    }
+    cellVal.alignment = { horizontal: 'center', vertical: 'middle' }
+
+    safeMerge(wsQ, r, 5, r, 7)
+    const cellDesc = wsQ.getCell(r, 5)
+    cellDesc.value = `=BUSCARV(C20,'${H_CLI}'!A6:H${cliLastRow},${colNum},0)`
+    cellDesc.font = { name: 'Courier New', size: 8.5, color: { argb: 'FF1565C0' } }
+    cellDesc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F8FF' } }
+    cellDesc.border = BORDER_SOFT
+    cellDesc.alignment = { vertical: 'middle' }
+  })
+
+  // Fila separadora
+  wsQ.getRow(30).height = 14
+
+  // ════════════════════════════════════════════════════════════════════════
+  // SECCIÓN 3: BUSCARV — Consulta de EMPLEADO por Cédula
+  // Columnas hoja Talento Humano: A=Cédula, B=Nombres, C=Apellidos, D=Cargo,
+  //   E=Área, F=Estado, G=Tipo Contrato, H=Fecha Ingreso, I=Salario, J=EPS, K=Teléfono, L=Correo
+  // ════════════════════════════════════════════════════════════════════════
+
+  wsQ.getRow(31).height = 26
+  safeMerge(wsQ, 31, 2, 31, 7)
+  const qT3 = wsQ.getCell(31, 2)
+  qT3.value = '👔 SECCIÓN 3 — BUSCARV: Consultar Empleado por Cédula'
+  qT3.font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FFFFFFFF' } }
+  qT3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4A148C' } }
+  qT3.alignment = { horizontal: 'left', vertical: 'middle' }
+
+  wsQ.getRow(32).height = 28
+  wsQ.getCell(32, 2).value = '🔎 Ingrese Cédula del Empleado:'
+  wsQ.getCell(32, 2).font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF4A148C' } }
+  wsQ.getCell(32, 2).alignment = { vertical: 'middle' }
+  wsQ.getCell(32, 2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3E5F5' } }
+  wsQ.getCell(32, 2).border = BORDER_SOFT
+
+  const EMP_INPUT = 'C32'
+  wsQ.getCell(32, 3).value = empleados.length > 0 ? String(empleados[0].cedula || '') : ''
+  wsQ.getCell(32, 3).font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF4A148C' } }
+  wsQ.getCell(32, 3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } }
+  wsQ.getCell(32, 3).border = {
+    top: { style: 'medium', color: { argb: 'FFFF6F00' } },
+    bottom: { style: 'medium', color: { argb: 'FFFF6F00' } },
+    left: { style: 'medium', color: { argb: 'FFFF6F00' } },
+    right: { style: 'medium', color: { argb: 'FFFF6F00' } },
+  }
+  wsQ.getCell(32, 3).alignment = { horizontal: 'center', vertical: 'middle' }
+
+  safeMerge(wsQ, 32, 4, 32, 7)
+  wsQ.getCell(32, 4).value = '← Escribe la cédula. BUSCARV busca en la hoja Talento Humano'
+  wsQ.getCell(32, 4).font = { name: 'Segoe UI', size: 9, italic: true, color: { argb: 'FF777777' } }
+  wsQ.getCell(32, 4).alignment = { vertical: 'middle' }
+
+  // Headers resultados empleados
+  wsQ.getRow(33).height = 24
+  wsQ.getCell(33, 2).value = 'Campo'
+  wsQ.getCell(33, 2).font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FFFFFFFF' } }
+  wsQ.getCell(33, 2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4A148C' } }
+  wsQ.getCell(33, 2).alignment = { horizontal: 'center', vertical: 'middle' }
+  wsQ.getCell(33, 2).border = BORDER_SOFT
+  safeMerge(wsQ, 33, 3, 33, 4)
+  wsQ.getCell(33, 3).value = 'Valor BUSCARV'
+  wsQ.getCell(33, 3).font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FFFFFFFF' } }
+  wsQ.getCell(33, 3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4A148C' } }
+  wsQ.getCell(33, 3).alignment = { horizontal: 'center', vertical: 'middle' }
+  wsQ.getCell(33, 3).border = BORDER_SOFT
+  safeMerge(wsQ, 33, 5, 33, 7)
+  wsQ.getCell(33, 5).value = 'Descripción de la fórmula'
+  wsQ.getCell(33, 5).font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FFFFFFFF' } }
+  wsQ.getCell(33, 5).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4A148C' } }
+  wsQ.getCell(33, 5).alignment = { horizontal: 'center', vertical: 'middle' }
+  wsQ.getCell(33, 5).border = BORDER_SOFT
+
+  const camposEmp = [
+    { label: 'Nombres',          colNum: 2 },
+    { label: 'Apellidos',        colNum: 3 },
+    { label: 'Cargo',            colNum: 4 },
+    { label: 'Área',             colNum: 5 },
+    { label: 'Estado',           colNum: 6 },
+    { label: 'Tipo de Contrato', colNum: 7 },
+    { label: 'Fecha Ingreso',    colNum: 8 },
+    { label: 'Salario Base',     colNum: 9, numFmt: '"$"#,##0' },
+    { label: 'EPS',              colNum: 10 },
+    { label: 'Teléfono',         colNum: 11 },
+    { label: 'Correo',           colNum: 12 },
+  ]
+  const thRangeName = `'${H_TH}'!A6:L${thLastRow}`
+
+  camposEmp.forEach(({ label, colNum, numFmt }, idx) => {
+    const r = 34 + idx
+    wsQ.getRow(r).height = 22
+    const even = idx % 2 === 1
+    const bgArgb = even ? 'FFF6FAF4' : 'FFFFFFFF'
+
+    wsQ.getCell(r, 2).value = label
+    wsQ.getCell(r, 2).font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF4A148C' } }
+    wsQ.getCell(r, 2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgArgb } }
+    wsQ.getCell(r, 2).border = BORDER_SOFT
+    wsQ.getCell(r, 2).alignment = { vertical: 'middle' }
+
+    safeMerge(wsQ, r, 3, r, 4)
+    const cellVal = wsQ.getCell(r, 3)
+    const formula = `VLOOKUP(${EMP_INPUT},${thRangeName},${colNum},0)`
+    cellVal.value = { formula }
+    cellVal.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF4A148C' } }
+    cellVal.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: even ? 'FFF3E5F5' : 'FFECE0F5' } }
+    cellVal.border = {
+      top: { style: 'thin', color: { argb: 'FF4A148C' } },
+      bottom: { style: 'thin', color: { argb: 'FF4A148C' } },
+      left: { style: 'medium', color: { argb: 'FF4A148C' } },
+      right: { style: 'medium', color: { argb: 'FF4A148C' } },
+    }
+    cellVal.alignment = { horizontal: 'center', vertical: 'middle' }
+    if (numFmt) cellVal.numFmt = numFmt
+
+    safeMerge(wsQ, r, 5, r, 7)
+    const cellDesc = wsQ.getCell(r, 5)
+    cellDesc.value = `=BUSCARV(C32,'${H_TH}'!A6:L${thLastRow},${colNum},0)`
+    cellDesc.font = { name: 'Courier New', size: 8.5, color: { argb: 'FF4A148C' } }
+    cellDesc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9F3FF' } }
+    cellDesc.border = BORDER_SOFT
+    cellDesc.alignment = { vertical: 'middle' }
+  })
+
+  // Fila separadora
+  wsQ.getRow(46).height = 18
+
+  // ════════════════════════════════════════════════════════════════════════
+  // SECCIÓN 4: BUSCARH — Tabla de Métricas Resumen por Categoría de Producto
+  // BUSCARH busca en la PRIMERA FILA (cabecera horizontal) el nombre de
+  // la categoría y devuelve el valor de la fila indicada.
+  // ════════════════════════════════════════════════════════════════════════
+
+  wsQ.getRow(47).height = 26
+  safeMerge(wsQ, 47, 2, 47, 7)
+  const qT4 = wsQ.getCell(47, 2)
+  qT4.value = '📊 SECCIÓN 4 — BUSCARH: Métricas Resumen por Categoría de Producto'
+  qT4.font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FFFFFFFF' } }
+  qT4.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF004D40' } }
+  qT4.alignment = { horizontal: 'left', vertical: 'middle' }
+
+  // Construir tabla de resumen por categoría (horizontal)
+  const catMap = {}
+  productos.forEach((p) => {
+    const cat = String(p.categoria || 'Sin Categoría').trim()
+    if (!catMap[cat]) catMap[cat] = { stock: 0, valor: 0, count: 0 }
+    catMap[cat].stock += Number(p.stock_actual) || 0
+    catMap[cat].valor += Number(p.valor_inventario) || ((p.costo_unitario || 0) * (p.stock_actual || 0))
+    catMap[cat].count += 1
+  })
+  const categorias = Object.keys(catMap)
+
+  // Tabla horizontal: fila 48 = cabeceras (categorías), filas 49-51 = métricas
+  // Columnas: B=etiqueta fila, C...(C+n) = una por categoría
+  wsQ.getRow(48).height = 24
+  wsQ.getRow(49).height = 22
+  wsQ.getRow(50).height = 22
+  wsQ.getRow(51).height = 22
+
+  // Columna B: título de la tabla y etiquetas de filas
+  wsQ.getCell(48, 2).value = 'Indicador \ Categoría →'
+  wsQ.getCell(48, 2).font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FFFFFFFF' } }
+  wsQ.getCell(48, 2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF004D40' } }
+  wsQ.getCell(48, 2).border = BORDER_SOFT
+  wsQ.getCell(48, 2).alignment = { horizontal: 'center', vertical: 'middle' }
+
+  const metricasLabels = [
+    { row: 49, label: 'Cantidad de Productos',  key: 'count',  numFmt: '#,##0' },
+    { row: 50, label: 'Stock Total (uds)',       key: 'stock',  numFmt: '#,##0' },
+    { row: 51, label: 'Valor Inventario ($)',    key: 'valor',  numFmt: '"$"#,##0' },
+  ]
+
+  metricasLabels.forEach(({ row, label }) => {
+    wsQ.getCell(row, 2).value = label
+    wsQ.getCell(row, 2).font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF004D40' } }
+    wsQ.getCell(row, 2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F2F1' } }
+    wsQ.getCell(row, 2).border = BORDER_SOFT
+    wsQ.getCell(row, 2).alignment = { vertical: 'middle' }
+  })
+
+  // Rellenar columnas de categorías (máximo 5 para que quepan en el ancho)
+  const maxCats = Math.min(categorias.length, 5)
+  categorias.slice(0, maxCats).forEach((cat, catIdx) => {
+    const col = 3 + catIdx  // C, D, E, F, G
+    const data = catMap[cat]
+
+    // Fila 48: cabecera de categoría
+    wsQ.getCell(48, col).value = cat
+    wsQ.getCell(48, col).font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FFFFFFFF' } }
+    wsQ.getCell(48, col).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF00695C' } }
+    wsQ.getCell(48, col).border = BORDER_SOFT
+    wsQ.getCell(48, col).alignment = { horizontal: 'center', vertical: 'middle' }
+
+    // Filas 49-51: métricas
+    metricasLabels.forEach(({ row, key, numFmt }) => {
+      wsQ.getCell(row, col).value = data[key]
+      wsQ.getCell(row, col).font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF00695C' } }
+      wsQ.getCell(row, col).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: catIdx % 2 === 0 ? 'FFE0F2F1' : 'FFB2DFDB' } }
+      wsQ.getCell(row, col).border = BORDER_SOFT
+      wsQ.getCell(row, col).alignment = { horizontal: 'center', vertical: 'middle' }
+      wsQ.getCell(row, col).numFmt = numFmt
+    })
+  })
+
+  // ── Fila 53: ejemplo BUSCARH ─────────────────────────────────────────────
+  wsQ.getRow(53).height = 24
+  safeMerge(wsQ, 53, 2, 53, 7)
+  const qExplain = wsQ.getCell(53, 2)
+  qExplain.value = '💡 Ejemplo de BUSCARH: La celda C55 usa BUSCARH para buscar la primera categoría en la fila de cabecera (fila 48) y devolver el Stock Total de esa categoría'
+  qExplain.font = { name: 'Segoe UI', size: 9, italic: true, color: { argb: 'FF004D40' } }
+  qExplain.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F2F1' } }
+  qExplain.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true }
+  qExplain.border = BORDER_SOFT
+
+  // ── Fila 54: celda de búsqueda BUSCARH ──────────────────────────────────
+  wsQ.getRow(54).height = 26
+  wsQ.getCell(54, 2).value = '🔎 Categoría a buscar (BUSCARH):'
+  wsQ.getCell(54, 2).font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF004D40' } }
+  wsQ.getCell(54, 2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F2F1' } }
+  wsQ.getCell(54, 2).border = BORDER_SOFT
+  wsQ.getCell(54, 2).alignment = { vertical: 'middle' }
+
+  // Celda amarilla de entrada BUSCARH
+  const BUSCARH_INPUT = 'C54'
+  wsQ.getCell(54, 3).value = categorias.length > 0 ? categorias[0] : ''
+  wsQ.getCell(54, 3).font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF004D40' } }
+  wsQ.getCell(54, 3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } }
+  wsQ.getCell(54, 3).border = {
+    top: { style: 'medium', color: { argb: 'FFFF6F00' } },
+    bottom: { style: 'medium', color: { argb: 'FFFF6F00' } },
+    left: { style: 'medium', color: { argb: 'FFFF6F00' } },
+    right: { style: 'medium', color: { argb: 'FFFF6F00' } },
+  }
+  wsQ.getCell(54, 3).alignment = { horizontal: 'center', vertical: 'middle' }
+
+  // ── Filas 55-57: Resultados BUSCARH ─────────────────────────────────────
+  // La tabla de categorías está en C48:G51
+  // Fila 1 de cabecera = fila 48, fila 2 = count (fila 49), fila 3 = stock (fila 50), fila 4 = valor (fila 51)
+  const catTableRange = `C48:${getColumnLetter(2 + maxCats)}51`
+
+  const buscarHResultados = [
+    { row: 55, label: 'Cant. de Productos (BUSCARH fila 2)', rowIdx: 2, numFmt: '#,##0' },
+    { row: 56, label: 'Stock Total uds (BUSCARH fila 3)',    rowIdx: 3, numFmt: '#,##0' },
+    { row: 57, label: 'Valor Inventario $ (BUSCARH fila 4)', rowIdx: 4, numFmt: '"$"#,##0' },
+  ]
+
+  buscarHResultados.forEach(({ row, label, rowIdx, numFmt }, idx) => {
+    wsQ.getRow(row).height = 22
+    const even = idx % 2 === 1
+
+    wsQ.getCell(row, 2).value = label
+    wsQ.getCell(row, 2).font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF004D40' } }
+    wsQ.getCell(row, 2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: even ? 'FFB2DFDB' : 'FFE0F2F1' } }
+    wsQ.getCell(row, 2).border = BORDER_SOFT
+    wsQ.getCell(row, 2).alignment = { vertical: 'middle' }
+
+    // Valor con fórmula BUSCARH
+    safeMerge(wsQ, row, 3, row, 4)
+    const cellH = wsQ.getCell(row, 3)
+    const hFormula = `HLOOKUP(${BUSCARH_INPUT},${catTableRange},${rowIdx},0)`
+    cellH.value = { formula: hFormula }
+    cellH.font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF004D40' } }
+    cellH.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: even ? 'FFCCF7F0' : 'FFB2DFDB' } }
+    cellH.border = {
+      top: { style: 'thin', color: { argb: 'FF004D40' } },
+      bottom: { style: 'thin', color: { argb: 'FF004D40' } },
+      left: { style: 'medium', color: { argb: 'FF004D40' } },
+      right: { style: 'medium', color: { argb: 'FF004D40' } },
+    }
+    cellH.alignment = { horizontal: 'center', vertical: 'middle' }
+    cellH.numFmt = numFmt
+
+    // Descripción de la fórmula
+    safeMerge(wsQ, row, 5, row, 7)
+    const cellDescH = wsQ.getCell(row, 5)
+    cellDescH.value = `=BUSCARH(C54,${catTableRange},${rowIdx},0)`
+    cellDescH.font = { name: 'Courier New', size: 8.5, color: { argb: 'FF004D40' } }
+    cellDescH.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FBF8' } }
+    cellDescH.border = BORDER_SOFT
+    cellDescH.alignment = { vertical: 'middle' }
+  })
+
+  // ── Fila 59: Nota final ──────────────────────────────────────────────────
+  wsQ.getRow(59).height = 20
+  safeMerge(wsQ, 59, 2, 59, 7)
+  const qNota = wsQ.getCell(59, 2)
+  qNota.value =
+    '✅ Instrucciones: Modifica el valor de las celdas AMARILLAS para buscar otro código, cédula o categoría. Las fórmulas BUSCARV y BUSCARH actualizan todos los resultados automáticamente en tiempo real.'
+  qNota.font = { name: 'Segoe UI', size: 9, italic: true, color: { argb: 'FF1B5E20' } }
+  qNota.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5E9' } }
+  qNota.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+  qNota.border = BORDER_SOFT
 
   await descargarWorkbook(wb, 'AgroInsumos_LIBRO_MAESTRO_ERP')
   return true
